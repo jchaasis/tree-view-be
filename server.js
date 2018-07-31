@@ -47,25 +47,26 @@ app.use(function(req, res, next) {
   //post routes
   app.post("/add", function(req, res){
       console.log('data posted')
-    // let data = [];
-    // let finalData;
-    // req.on('data', (chunk) => {
-    //     data.push(chunk);
-    //   }).on('end', () => {
-    //     //Filter out the data from the post request
-    //     data = Buffer.concat(data).toString();
-    //     //parse that data
-    //     finalData = JSON.parse(data);
+    let data = [];
+    let finalData;
+    req.on('data', (chunk) => {
+        data.push(chunk);
+      }).on('end', () => {
+        //Filter out the data from the post request
+        data = Buffer.concat(data).toString();
+        //parse that data
+        finalData = JSON.parse(data);
+        console.log(finalData)
     //     //add a new score based off of the received data
     //      Score.create({
     //         player: finalData.user,
     //         score: finalData.score,
     //      });
-    //   })
+      })
     //   //let the client know that we have received the information
-    //   res.send({
-    //       'request received': true
-    //   })
+      res.send({
+          'request received': true
+      })
   })
 
 app.listen(port, function(){
