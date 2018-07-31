@@ -1,5 +1,5 @@
 const express = require('express');
-// const Sequelize = require('sequelize');
+const Sequelize = require('sequelize');
 
 //will use bodyparser to accept the form data for the score
 const bodyparser = require('body-parser');
@@ -17,32 +17,43 @@ app.use(function(req, res, next) {
     next();
 });
 //create database
-// const db = new Sequelize('treeView', 'christianhaasis', '', {
-//     dialect: 'postgres',
-// });
-//schema for the scores database
-// const Score = db.define('score', {
-//     player: Sequelize.STRING,
-//     score: Sequelize.INTEGER,
-// });
+const db = new Sequelize('treeView', 'christianhaasis', '', {
+    dialect: 'postgres',
+});
 
-// Sychronize the Score schema with the database, meaning make
+//schema for the branch database
+const Branch = db.define('branch', {
+    name: Sequelize.STRING,
+    children: Sequelize.INTEGER,
+    min_range: Sequelize.INTEGER,
+    max_range: Sequelize.INTEGER
+});
+
+const Leaf = db.define('leaf', {
+    branch_name: Sequelize.STRING,
+    leaf_number: Sequelize.INTEGER
+});
+
+// Sychronize the schemas with the database, meaning make
 // sure all tables exist and have the right fields.
-// Score.sync()
+Branch.sync();
+Leaf.sync();
+
+//utility functions. TODO: move these elsewhere
 //establish routes
   //get routes
   //get all the scores to display on the sidebar
   app.get("/", function(req, res){
       console.log('request received')
-      res.send({response: "recieved the request"})
-    // Score.findAll({
-    // // Will order by score descending
+    //   res.send({response: "recieved the request"})
+    Branch.findAll({
+    // Will order by score descending
     // order: Sequelize.literal('score DESC')
-    // }).then((items)=>{
-    //   res.send({
-    //             Scores: items,
-    //   });
-    // });
+    }).then((items)=>{
+      res.send({
+                Branches: items,
+      });
+    });
   });
   //post routes
   app.post("/add", function(req, res){
@@ -57,11 +68,13 @@ app.use(function(req, res, next) {
         //parse that data
         finalData = JSON.parse(data);
         console.log(finalData)
-    //     //add a new score based off of the received data
-    //      Score.create({
-    //         player: finalData.user,
-    //         score: finalData.score,
-    //      });
+    //     //add a new Branch based off of the received data
+         Branch.create({
+            name: finalData.name,
+            children: finalData.children,
+            min_range: finalData.min,
+            max_range: finalData.max,
+         });
       })
     //   //let the client know that we have received the information
       res.send({
