@@ -40,6 +40,15 @@ Branch.sync();
 Leaf.sync();
 
 //utility functions. TODO: move these elsewhere
+    //get a random number between the range set 
+    function getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min)) + min; 
+      }
+
+    
+
 //establish routes
   //get routes
   //get all the scores to display on the sidebar
