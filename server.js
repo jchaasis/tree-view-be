@@ -36,6 +36,10 @@ const Leaf = db.define('leaf', {
     leafNumber: Sequelize.INTEGER
 });
 
+//table relationships
+Branch.hasMany(Leaf, {foreignkey: 'branchId', as: 'leaves'});
+Leaf.belongsTo(Branch, {foreignKey: 'branchId'});
+
 // Sychronize the schemas with the database, meaning make
 // sure all tables exist and have the right fields.
 Branch.sync();
@@ -77,6 +81,7 @@ io.on('connection', (client) => {
         console.log('a user is receiving the branch ', interval );
         //get all the branches
         Branch.findAll({
+            include: [ {model: Leaf, as: 'leaves'}],
             // Will order by score descending
             // order: Sequelize.literal('score DESC')
             }).then((items)=>{
@@ -98,6 +103,7 @@ io.on('connection', (client) => {
         })
         .then(()=>
              Branch.findAll({
+                include: [ {model: Leaf, as: 'leaves'}],
             // Will order by score descending
             // order: Sequelize.literal('score DESC')
             }).then((items)=>{
