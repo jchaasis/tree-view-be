@@ -32,8 +32,8 @@ const Branch = db.define('branch', {
 });
 
 const Leaf = db.define('leaf', {
-    branch_id: Sequelize.INTEGER,
-    leaf_number: Sequelize.INTEGER
+    branchId: Sequelize.INTEGER,
+    leafNumber: Sequelize.INTEGER
 });
 
 // Sychronize the schemas with the database, meaning make
@@ -49,16 +49,16 @@ Leaf.sync();
         return Math.floor(Math.random() * (max - min)) + min; 
       }
 
-    function growLeaves(childs, min, max, branchID) {
+    function growLeaves(branch) {
         //counter to count the number of children to create
         let counter = 0;
         //store the numbers that will be used for leaves
         let leaves = [];
         //while the counter is less than the number of requested children, add a new random number to the array with the corresponding branchid
-        while (counter < childs){
+        while (counter < branch.children){
             leaves.push({
-                branch_id: branchID,
-                leaf_number: getRandomInt(min,max)
+                branchId: branch.id,
+                leafNumber: getRandomInt(branch.min_range,branch.max_range)
             })
             counter ++
         }
@@ -93,14 +93,8 @@ io.on('connection', (client) => {
             min_range: formData.min,
             max_range: formData.max,
         }).then((branch)=> {
-           
-            growLeaves(branch.children, branch.min_range, branch.max_range, branch.id)
-
-            // Leaf.create({
-            //     branch_id: branch.id,
-            //     leaf_number: getRandomInt(branch.min_range, branch.max_range),
-            // })
-           
+           //create a batch of leaves
+            growLeaves(branch)
         })
         .then(()=>
              Branch.findAll({
