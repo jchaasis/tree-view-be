@@ -32,7 +32,7 @@ const Branch = db.define('branch', {
 });
 
 const Leaf = db.define('leaf', {
-    branch_name: Sequelize.STRING,
+    branch_id: Sequelize.INTEGER,
     leaf_number: Sequelize.INTEGER
 });
 
@@ -48,6 +48,23 @@ Leaf.sync();
         max = Math.floor(max);
         return Math.floor(Math.random() * (max - min)) + min; 
       }
+
+    function growLeaves(childs, min, max, branchID) {
+        //counter to count the number of children to create
+        let counter = 0;
+        //store the numbers that will be used for leaves
+        let leaves = [];
+        //while the counter is less than the number of requested children, add a new random number to the array with the corresponding branchid
+        while (counter < childs){
+            leaves.push({
+                branch_id: branchID,
+                leaf_number: getRandomInt(min,max)
+            })
+            counter ++
+        }
+        //create a bulk of instances based off of the numbers stored in the leaves array
+        Leaf.bulkCreate(leaves);
+    }
 
 //socket stuff
 // io.on('connection', function(socket){
@@ -69,12 +86,23 @@ io.on('connection', (client) => {
     //add a new branch to the table. Once added, emit the updated tree to all users.
     client.on('addBranch', (formData)=> {
         console.log(formData.name);
+        //add instance in the branches table
         Branch.create({
             name: formData.name,
             children: formData.children,
             min_range: formData.min,
             max_range: formData.max,
-        }).then(()=>
+        }).then((branch)=> {
+           
+            growLeaves(branch.children, branch.min_range, branch.max_range, branch.id)
+
+            // Leaf.create({
+            //     branch_id: branch.id,
+            //     leaf_number: getRandomInt(branch.min_range, branch.max_range),
+            // })
+           
+        })
+        .then(()=>
              Branch.findAll({
             // Will order by score descending
             // order: Sequelize.literal('score DESC')
