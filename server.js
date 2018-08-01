@@ -58,11 +58,34 @@ io.on('connection', (client) => {
     //send the branch data currently stored in the database
     client.on('getBranchData', (interval)=> {
         console.log('a user is receiving the branch ', interval );
-
-        setInterval(() => {
-            client.emit('timer', new Date());//
-          }, interval);
+        //get all the branches
+        Branch.findAll({
+            // Will order by score descending
+            // order: Sequelize.literal('score DESC')
+            }).then((items)=>{
+                client.emit('branches', {Branches: items});//send data
+            });
     })
+    //add a new branch to the table. Once added, emit the updated tree to all users.
+    client.on('addBranch', (formData)=> {
+        console.log(formData.name);
+        Branch.create({
+            name: formData.name,
+            children: formData.children,
+            min_range: formData.min,
+            max_range: formData.max,
+        }).then(()=>
+             Branch.findAll({
+            // Will order by score descending
+            // order: Sequelize.literal('score DESC')
+            }).then((items)=>{
+                io.emit('branches', {Branches: items});//send data
+            }));
+    })
+    //when a user disconnects
+    client.on('disconnect', function(){
+        console.log('user disconnected');
+      });
 });
 //establish routes
   //get routes
