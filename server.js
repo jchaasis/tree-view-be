@@ -1,11 +1,13 @@
 const express = require('express');
 const Sequelize = require('sequelize');
-
 //will use bodyparser to accept the form data for the score
 const bodyparser = require('body-parser');
 //establish server
 const port = process.env.PORT || 5000;
 const app = express();
+var http = require('http').Server(app);
+
+var io = require('socket.io')();
 
 //initialize bodyparser
 app.use(bodyparser.urlencoded({ extended: false }));
@@ -47,8 +49,21 @@ Leaf.sync();
         return Math.floor(Math.random() * (max - min)) + min; 
       }
 
-    
+//socket stuff
+// io.on('connection', function(socket){
+//     console.log('a user connected');
+// });
 
+io.on('connection', (client) => {
+    //send the branch data currently stored in the database
+    client.on('getBranchData', (interval)=> {
+        console.log('a user is receiving the branch ', interval );
+
+        setInterval(() => {
+            client.emit('timer', new Date());//
+          }, interval);
+    })
+});
 //establish routes
   //get routes
   //get all the scores to display on the sidebar
@@ -91,6 +106,8 @@ Leaf.sync();
       })
   })
 
-app.listen(port, function(){
-    console.log(`Listening on port ${port}`);
-  });
+
+io.listen(port);
+// app.listen(port, function(){
+//     console.log(`Listening on port ${port}`);
+//   });
