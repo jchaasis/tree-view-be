@@ -90,7 +90,6 @@ io.on('connection', (client) => {
     })
     //add a new branch to the table. Once added, emit the updated tree to all users.
     client.on('addBranch', (formData)=> {
-        console.log(formData.name);
         //add instance in the branches table
         Branch.create({
             name: formData.name,
@@ -109,6 +108,31 @@ io.on('connection', (client) => {
             }).then((items)=>{
                 io.emit('branches', {Branches: items});//send data
             }));
+    })
+
+    //remove a branch from the table. Once removed, remove the associated leaves as well. once both of those tasks are complete, emit the updated tree to all active users.
+    client.on('deleteBranch', branch=> {
+        Branch.destroy({
+            where: {
+                id: branch
+            }
+        }).then(()=>{
+            Leaf.destroy({
+                where: {
+                    branchId: branch
+                }
+            })
+        }).then(()=> {
+            Branch.findAll({
+                include: [ {model: Leaf, as: 'leaves'}],
+            // Will order by score descending
+            // order: Sequelize.literal('score DESC')
+            }).then((items)=>{
+                io.emit('branches', {Branches: items});//send data
+            });
+        })
+        
+
     })
     //when a user disconnects
     client.on('disconnect', function(){
