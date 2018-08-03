@@ -82,8 +82,8 @@ io.on('connection', (client) => {
         //get all the branches
         Branch.findAll({
             include: [ {model: Leaf, as: 'leaves'}],
-            // Will order by score descending
-            // order: Sequelize.literal('score DESC')
+            // Will order by id 
+            order: Sequelize.literal('id')
             }).then((items)=>{
                 client.emit('branches', {Branches: items});//send data
             });
@@ -103,6 +103,7 @@ io.on('connection', (client) => {
         .then(()=>
              Branch.findAll({
                 include: [ {model: Leaf, as: 'leaves'}],
+                order: Sequelize.literal('id')
             // Will order by score descending
             // order: Sequelize.literal('score DESC')
             }).then((items)=>{
@@ -125,6 +126,7 @@ io.on('connection', (client) => {
         }).then(()=> {
             Branch.findAll({
                 include: [ {model: Leaf, as: 'leaves'}],
+                order: Sequelize.literal('id')
             // Will order by score descending
             // order: Sequelize.literal('score DESC')
             }).then((items)=>{
@@ -132,9 +134,11 @@ io.on('connection', (client) => {
             });
         })
     })
-
+    //updatethe branches
     client.on('updateBranch', branch=> {
-        if(branch.name.length > 0 && (branch.min === '' && branch.max === '')){
+        console.log(branch)
+        //if the name is the only property to update.
+        if(branch.name !== '' && (branch.min === '' && branch.max === '')){
             Branch.update(
                 {name: branch.name},
                 {
@@ -144,13 +148,46 @@ io.on('connection', (client) => {
             }).then(()=> {
                 Branch.findAll({
                     include: [ {model: Leaf, as: 'leaves'}],
-                // Will order by score descending
-                // order: Sequelize.literal('score DESC')
+                // Will order by creation time descending
+                order: Sequelize.literal('id')
                 }).then((items)=>{
                     io.emit('branches', {Branches: items});//send data
                 });
             })
+        //if we need to update both the min and the max range
+        } 
+        else if( branch.name === '' && (branch.min !== '' && branch.max !== '')){
+            Branch.update(
+                {min_range: branch.min,
+                max_range: branch.max},
+                {
+                where: {
+                    id: branch.id
+                }
+            }).then(()=> {
+                //remove the previous leaves before adding new ones
+                Leaf.destroy({
+                    where: {
+                        branchId: branch.id
+                    }
+                }).then(()=>{
+                    //add new leaves with the new branch info
+                    growLeaves(branch)
+                    
+                }).then(()=> {
+                    //send out the updated tree
+                    Branch.findAll({
+                        include: [ {model: Leaf, as: 'leaves'}],
+                        order: Sequelize.literal('id')
+                    }).then((items)=>{
+                        io.emit('branches', {Branches: items});//send data
+                    });
+                })
+              
+            })
         }
+
+
         console.log(branch)
     })
 
