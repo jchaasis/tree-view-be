@@ -27,8 +27,8 @@ const db = new Sequelize('treeView', 'christianhaasis', '', {
 const Branch = db.define('branch', {
     name: Sequelize.STRING,
     children: Sequelize.INTEGER,
-    min_range: Sequelize.INTEGER,
-    max_range: Sequelize.INTEGER
+    min: Sequelize.INTEGER,
+    max: Sequelize.INTEGER
 });
 
 const Leaf = db.define('leaf', {
@@ -54,18 +54,24 @@ Leaf.sync();
       }
 
     function growLeaves(branch) {
+        console.log('there are this many children: ' + branch.children);
         //counter to count the number of children to create
         let counter = 0;
         //store the numbers that will be used for leaves
         let leaves = [];
+        
         //while the counter is less than the number of requested children, add a new random number to the array with the corresponding branchid
         while (counter < branch.children){
             leaves.push({
                 branchId: branch.id,
-                leafNumber: getRandomInt(branch.min_range,branch.max_range)
+                leafNumber: getRandomInt(branch.min,branch.max)
             })
             counter ++
         }
+        for (let i = 0; i<leaves.length; i++){
+            console.log(`leaf generated. branchId: ${leaves[i].branchId} leafnumber: ${leaves[i].leafNumber}`)
+        }
+        console.log('leaves generated, the result is: ' + leaves)
         //create a bulk of instances based off of the numbers stored in the leaves array
         Leaf.bulkCreate(leaves);
     }
@@ -94,8 +100,8 @@ io.on('connection', (client) => {
         Branch.create({
             name: formData.name,
             children: formData.children,
-            min_range: formData.min,
-            max_range: formData.max,
+            min: formData.min,
+            max: formData.max,
         }).then((branch)=> {
            //create a batch of leaves
             growLeaves(branch)
@@ -158,8 +164,8 @@ io.on('connection', (client) => {
         } 
         else if( branch.name === '' && (branch.min !== '' && branch.max !== '')){
             Branch.update(
-                {min_range: branch.min,
-                max_range: branch.max},
+                {min: branch.min,
+                max: branch.max},
                 {
                 where: {
                     id: branch.id
@@ -171,6 +177,7 @@ io.on('connection', (client) => {
                         branchId: branch.id
                     }
                 }).then(()=>{
+                    console.log(branch.id + ' is the branch id right before the new leaves grow. it is also ' + typeof(branch.id))
                     //add new leaves with the new branch info
                     growLeaves(branch)
                     
@@ -229,8 +236,8 @@ io.on('connection', (client) => {
          Branch.create({
             name: finalData.name,
             children: finalData.children,
-            min_range: finalData.min,
-            max_range: finalData.max,
+            min: finalData.min,
+            max: finalData.max,
          });
       })
     //   //let the client know that we have received the information
