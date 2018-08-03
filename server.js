@@ -131,9 +131,30 @@ io.on('connection', (client) => {
                 io.emit('branches', {Branches: items});//send data
             });
         })
-        
-
     })
+
+    client.on('updateBranch', branch=> {
+        if(branch.name.length > 0 && (branch.min === '' && branch.max === '')){
+            Branch.update(
+                {name: branch.name},
+                {
+                where: {
+                    id: branch.id
+                }
+            }).then(()=> {
+                Branch.findAll({
+                    include: [ {model: Leaf, as: 'leaves'}],
+                // Will order by score descending
+                // order: Sequelize.literal('score DESC')
+                }).then((items)=>{
+                    io.emit('branches', {Branches: items});//send data
+                });
+            })
+        }
+        console.log(branch)
+    })
+
+
     //when a user disconnects
     client.on('disconnect', function(){
         console.log('user disconnected');
