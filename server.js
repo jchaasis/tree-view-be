@@ -53,18 +53,23 @@ Leaf.sync();
         return Math.floor(Math.random() * (max - min)) + min; 
       }
 
-    function growLeaves(branch) {
+    function growLeaves(branch, edit) {
+
         console.log('there are this many children: ' + branch.children);
+        //if edit is true, then this will be a generation of new leaves based off of the edited range of a preexisting branch. We need to store the appropriate min and max values for use in leaf generation. 
+          //if its an edit and there is no new min set, then use the old min
+        let min = (edit === true && branch.min === '') ? branch.oldMin : branch.min;
+          //if its an edit and there is no new max set, then use the old max
+        let max = (edit === true && branch.max === '') ? branch.oldMax: branch.max;
         //counter to count the number of children to create
         let counter = 0;
         //store the numbers that will be used for leaves
         let leaves = [];
-        
         //while the counter is less than the number of requested children, add a new random number to the array with the corresponding branchid
         while (counter < branch.children){
             leaves.push({
                 branchId: branch.id,
-                leafNumber: getRandomInt(branch.min,branch.max)
+                leafNumber: getRandomInt(min,max)
             })
             counter ++
         }
@@ -77,10 +82,6 @@ Leaf.sync();
     }
 
 //socket stuff
-// io.on('connection', function(socket){
-//     console.log('a user connected');
-// });
-
 io.on('connection', (client) => {
     //send the branch data currently stored in the database
     client.on('getBranchData', (interval)=> {
@@ -142,6 +143,9 @@ io.on('connection', (client) => {
     })
     //updatethe branches
     client.on('updateBranch', branch=> {
+        //handle the validation on the front end. This way, if there is a range update, we can perform that update in one conditional statement. 
+        let bMin = branch.min === '' ? branch.oldMin : parseInt(branch.min);
+        let bMax = branch.max === '' ? branch.oldMax : parseInt(branch.max);
         console.log(branch)
         //if the name is the only property to update.
         if(branch.name !== '' && (branch.min === '' && branch.max === '')){
@@ -160,12 +164,12 @@ io.on('connection', (client) => {
                     io.emit('branches', {Branches: items});//send data
                 });
             })
-        //if we need to update both the min and the max range
+        //update both the min and the max range. Even if one of them is being updated by the client, we will receive a number value for both the min and the max. If we don't then an error has occured or a bug is present. So if we update only the min, the old max will still be passed down so that we can generate the new leaves based off of the two values. 
         } 
-        else if( branch.name === '' && (branch.min !== '' && branch.max !== '')){
+        else if( branch.name === '' && (branch.min !== '' || branch.max !== '')){
             Branch.update(
-                {min: branch.min,
-                max: branch.max},
+                {min: bMin,
+                max: bMax},
                 {
                 where: {
                     id: branch.id
@@ -179,8 +183,7 @@ io.on('connection', (client) => {
                 }).then(()=>{
                     console.log(branch.id + ' is the branch id right before the new leaves grow. it is also ' + typeof(branch.id))
                     //add new leaves with the new branch info
-                    growLeaves(branch)
-                    
+                    growLeaves(branch, true)
                 }).then(()=> {
                     //send out the updated tree
                     Branch.findAll({
@@ -190,14 +193,9 @@ io.on('connection', (client) => {
                         io.emit('branches', {Branches: items});//send data
                     });
                 })
-              
             })
         }
-
-
-        console.log(branch)
     })
-
 
     //when a user disconnects
     client.on('disconnect', function(){
