@@ -55,7 +55,6 @@ Leaf.sync();
 
     function growLeaves(branch, edit) {
 
-        console.log('there are this many children: ' + branch.children);
         //if edit is true, then this will be a generation of new leaves based off of the edited range of a preexisting branch. We need to store the appropriate min and max values for use in leaf generation. 
           //if its an edit and there is no new min set, then use the old min
         let min = (edit === true && branch.min === '') ? branch.oldMin : branch.min;
@@ -73,10 +72,6 @@ Leaf.sync();
             })
             counter ++
         }
-        for (let i = 0; i<leaves.length; i++){
-            console.log(`leaf generated. branchId: ${leaves[i].branchId} leafnumber: ${leaves[i].leafNumber}`)
-        }
-        console.log('leaves generated, the result is: ' + leaves)
         //create a bulk of instances based off of the numbers stored in the leaves array
         Leaf.bulkCreate(leaves);
     }
@@ -110,10 +105,9 @@ Leaf.sync();
     function validateInputs(branch, edit) {
         //if its an edit and there is no new min set, then use the old min
         let min = (edit === true && branch.min === '') ? branch.oldMin : branch.min;
-        console.log(typeof(min));
+    
         //if its an edit and there is no new max set, then use the old max
         let max = (edit === true && branch.max === '') ? branch.oldMax : branch.max;
-        console.log(typeof(max))
 
         let valid = true;
         //Make sure that there are no symbols in any of the inputs
@@ -213,7 +207,7 @@ io.on('connection', (client) => {
         //validate the inputs from the edit form
         if (checkForSpecChars(branch)===true){
             client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
-            
+
             return;
         }
         //if the name is the only property to update.
@@ -240,7 +234,7 @@ io.on('connection', (client) => {
             })
         //update both the min and the max range. Even if one of them is being updated by the client, we will receive a number value for both the min and the max. If we don't then an error has occured or a bug is present. So if we update only the min, the old max will still be passed down so that we can generate the new leaves based off of the two values. 
         } 
-        else if( branch.name === '' && (branch.min !== '' || branch.max !== '')){
+        else if(branch.name === '' && (branch.min !== '' || branch.max !== '')){
              //validate the inputs from the edit form
             if (confirmNums([branch.children, bMin, bMax])===false){
                 client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
@@ -273,7 +267,50 @@ io.on('connection', (client) => {
                         io.emit('branches', {Branches: items});//send data
                     });
                 })
+            })//finally, if the name and atleaset on range input is being updated
+        } else if (branch.name !== '' && (branch.min !== '' || branch.max !== '')){
+            //validate name
+            if (checkForSpecChars(branch.name)===true || branch.name.length < 3 || branch.name.length > 15){
+                client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
+                return;
+            }
+            //validate nums
+            if (confirmNums([branch.children, bMin, bMax])===false){
+                client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
+                return;
+            }
+
+            Branch.update(
+                {
+                name: branch.name,
+                min: bMin,
+                max: bMax},
+                {
+                where: {
+                    id: branch.id
+                }
+            }).then(()=> {
+                //remove the previous leaves before adding new ones
+                Leaf.destroy({
+                    where: {
+                        branchId: branch.id
+                    }
+                }).then(()=>{
+                    console.log(branch.id + ' is the branch id right before the new leaves grow. it is also ' + typeof(branch.id))
+                    //add new leaves with the new branch info
+                    growLeaves(branch, true)
+                }).then(()=> {
+                    //send out the updated tree
+                    Branch.findAll({
+                        include: [ {model: Leaf, as: 'leaves'}],
+                        order: Sequelize.literal('id')
+                    }).then((items)=>{
+                        io.emit('branches', {Branches: items});//send data
+                    });
+                })
             })
+
+            
         }
     })
 
