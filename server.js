@@ -81,6 +81,64 @@ Leaf.sync();
         Leaf.bulkCreate(leaves);
     }
 
+    function checkForSpecChars(arr){
+        //store the chars counter
+        let specCharsPresent = false;
+        //symbols to check for
+        let re = /[ !@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/g;
+        //iterate through the information passed in and check for symbols in each element. 
+        for(let i = 0; i<arr.length; i++){
+            if (re.test(arr[i]) === true) {
+                return specCharsPresent = true;
+            }
+        }
+        return specCharsPresent;
+    }
+
+    function confirmNums(nums){
+        let allNums = true;
+        //make sure that the number inputs are actually numbers.
+        for (let i = 0; i<nums.length; i++){
+            //if there is anything other than a number present, the input is invalid.
+            if (!/\D/.test(nums[i] === false)){
+                return allNums = false;
+            }
+        }
+        return allNums;
+    }
+
+    function validateInputs(branch, edit) {
+        //if its an edit and there is no new min set, then use the old min
+        let min = (edit === true && branch.min === '') ? branch.oldMin : branch.min;
+        console.log(typeof(min));
+        //if its an edit and there is no new max set, then use the old max
+        let max = (edit === true && branch.max === '') ? branch.oldMax : branch.max;
+        console.log(typeof(max))
+
+        let valid = true;
+        //Make sure that there are no symbols in any of the inputs
+        if (checkForSpecChars([branch.name, branch.children, min, max])=== true){
+            valid = false;
+        }
+        //make sure that all the number inputs are actually numbers
+        if (confirmNums([branch.children, min, max]) === false){
+            valid = false;
+        }
+        //validate that the name input is between 3 and 15 chars
+        if (branch.name.length < 3 || branch.name.length > 15){
+            valid = false;
+        }
+        //validate that the children is between 0 and 15
+        if (branch.children < 0 || branch.children > 15){
+            valid = false;
+        }
+        //validate that the range is accurate
+        if (min >= max){
+            valid = false
+        }
+
+        return valid;
+    }
 //socket stuff
 io.on('connection', (client) => {
     //send the branch data currently stored in the database
@@ -97,6 +155,11 @@ io.on('connection', (client) => {
     })
     //add a new branch to the table. Once added, emit the updated tree to all users.
     client.on('addBranch', (formData)=> {
+        //validate that the inputs are acceptable
+        if (validateInputs(formData)===false){
+            client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the form for requirement details.')
+            return;
+        }
         //add instance in the branches table
         Branch.create({
             name: formData.name,
@@ -147,8 +210,19 @@ io.on('connection', (client) => {
         let bMin = branch.min === '' ? branch.oldMin : parseInt(branch.min);
         let bMax = branch.max === '' ? branch.oldMax : parseInt(branch.max);
         console.log(branch)
+        //validate the inputs from the edit form
+        if (checkForSpecChars(branch)===true){
+            client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
+            
+            return;
+        }
         //if the name is the only property to update.
         if(branch.name !== '' && (branch.min === '' && branch.max === '')){
+            //make sure the name is still acceptable
+            if (checkForSpecChars(branch.name)===true || branch.name.length < 3 || branch.name.length > 15){
+                client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
+                return;
+            }
             Branch.update(
                 {name: branch.name},
                 {
@@ -167,6 +241,12 @@ io.on('connection', (client) => {
         //update both the min and the max range. Even if one of them is being updated by the client, we will receive a number value for both the min and the max. If we don't then an error has occured or a bug is present. So if we update only the min, the old max will still be passed down so that we can generate the new leaves based off of the two values. 
         } 
         else if( branch.name === '' && (branch.min !== '' || branch.max !== '')){
+             //validate the inputs from the edit form
+            if (confirmNums([branch.children, bMin, bMax])===false){
+                client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
+                return;
+            }
+            //update the branch range
             Branch.update(
                 {min: bMin,
                 max: bMax},
@@ -202,50 +282,9 @@ io.on('connection', (client) => {
         console.log('user disconnected');
       });
 });
-//establish routes
-  //get routes
-  //get all the scores to display on the sidebar
-  app.get("/", function(req, res){
-      console.log('request received')
-    //   res.send({response: "recieved the request"})
-    Branch.findAll({
-    // Will order by score descending
-    // order: Sequelize.literal('score DESC')
-    }).then((items)=>{
-      res.send({
-                Branches: items,
-      });
-    });
-  });
-  //post routes
-  app.post("/add", function(req, res){
-      console.log('data posted')
-    let data = [];
-    let finalData;
-    req.on('data', (chunk) => {
-        data.push(chunk);
-      }).on('end', () => {
-        //Filter out the data from the post request
-        data = Buffer.concat(data).toString();
-        //parse that data
-        finalData = JSON.parse(data);
-        console.log(finalData)
-    //     //add a new Branch based off of the received data
-         Branch.create({
-            name: finalData.name,
-            children: finalData.children,
-            min: finalData.min,
-            max: finalData.max,
-         });
-      })
-    //   //let the client know that we have received the information
-      res.send({
-          'request received': true
-      })
-  })
-
 
 io.listen(port);
+console.log(`Listening on port ${port}`);
 // app.listen(port, function(){
 //     console.log(`Listening on port ${port}`);
 //   });
