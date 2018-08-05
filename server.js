@@ -54,7 +54,6 @@ Leaf.sync();
       }
 
     function growLeaves(branch, edit) {
-
         //if edit is true, then this will be a generation of new leaves based off of the edited range of a preexisting branch. We need to store the appropriate min and max values for use in leaf generation. 
           //if its an edit and there is no new min set, then use the old min
         let min = (edit === true && branch.min === '') ? branch.oldMin : branch.min;
@@ -104,10 +103,10 @@ Leaf.sync();
 
     function validateInputs(branch, edit) {
         //if its an edit and there is no new min set, then use the old min
-        let min = (edit === true && branch.min === '') ? branch.oldMin : branch.min;
+        let min = (edit === true && branch.min === '') ? branch.oldMin : parseInt(branch.min);
     
         //if its an edit and there is no new max set, then use the old max
-        let max = (edit === true && branch.max === '') ? branch.oldMax : branch.max;
+        let max = (edit === true && branch.max === '') ? branch.oldMax : parseInt(branch.max);
 
         let valid = true;
         //Make sure that there are no symbols in any of the inputs
@@ -133,12 +132,14 @@ Leaf.sync();
 
         return valid;
     }
+
+    //store the message so we don't have to repeat it multiple times
+    const formErrMess = 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located next to the root for requirement details.';
+
 //socket stuff
 io.on('connection', (client) => {
-    //send the branch data currently stored in the database
-    client.on('getBranchData', (interval)=> {
-        console.log('a user is receiving the branch ', interval );
-        //get all the branches
+    //functions containing repeating socket calls or sequelize queries
+    function findAndSendBranches(){
         Branch.findAll({
             include: [ {model: Leaf, as: 'leaves'}],
             // Will order by id 
@@ -146,15 +147,21 @@ io.on('connection', (client) => {
             }).then((items)=>{
                 client.emit('branches', {Branches: items});//send data
             });
+    }
+    //send the branch data currently stored in the database
+    client.on('getBranchData', (b)=> {
+        console.log('a user is receiving the branch ', b );
+        //get all the branches
+        findAndSendBranches();
     })
     //add a new branch to the table. Once added, emit the updated tree to all users.
     client.on('addBranch', (formData)=> {
         //validate that the inputs are acceptable
         if (validateInputs(formData)===false){
-            client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the form for requirement details.')
+            client.emit('formError', formErrMess)
             return;
         }
-        //add instance in the branches table
+        //add instance in the branches table. depending on how the number is inputed into the form, it could come across as an integer or a string. Parse it here to handle both methods.
         Branch.create({
             name: formData.name,
             children: formData.children,
@@ -164,15 +171,7 @@ io.on('connection', (client) => {
            //create a batch of leaves
             growLeaves(branch)
         })
-        .then(()=>
-             Branch.findAll({
-                include: [ {model: Leaf, as: 'leaves'}],
-                order: Sequelize.literal('id')
-            // Will order by score descending
-            // order: Sequelize.literal('score DESC')
-            }).then((items)=>{
-                io.emit('branches', {Branches: items});//send data
-            }));
+        .then(()=> findAndSendBranches());
     })
 
     //remove a branch from the table. Once removed, remove the associated leaves as well. once both of those tasks are complete, emit the updated tree to all active users.
@@ -187,17 +186,8 @@ io.on('connection', (client) => {
                     branchId: branch
                 }
             })
-        }).then(()=> {
-            Branch.findAll({
-                include: [ {model: Leaf, as: 'leaves'}],
-                order: Sequelize.literal('id')
-            // Will order by score descending
-            // order: Sequelize.literal('score DESC')
-            }).then((items)=>{
-                io.emit('branches', {Branches: items});//send data
-            });
-        })
-    })
+        }).then(()=> findAndSendBranches());
+    });
     //updatethe branches
     client.on('updateBranch', branch=> {
         //handle the validation on the front end. This way, if there is a range update, we can perform that update in one conditional statement. 
@@ -206,15 +196,14 @@ io.on('connection', (client) => {
         console.log(branch)
         //validate the inputs from the edit form
         if (checkForSpecChars(branch)===true){
-            client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
-
+            client.emit('formError', formErrMess)
             return;
         }
         //if the name is the only property to update.
         if(branch.name !== '' && (branch.min === '' && branch.max === '')){
             //make sure the name is still acceptable
             if (checkForSpecChars(branch.name)===true || branch.name.length < 3 || branch.name.length > 15){
-                client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
+                client.emit('formError', formErrMess)
                 return;
             }
             Branch.update(
@@ -223,21 +212,13 @@ io.on('connection', (client) => {
                 where: {
                     id: branch.id
                 }
-            }).then(()=> {
-                Branch.findAll({
-                    include: [ {model: Leaf, as: 'leaves'}],
-                // Will order by creation time descending
-                order: Sequelize.literal('id')
-                }).then((items)=>{
-                    io.emit('branches', {Branches: items});//send data
-                });
-            })
+            }).then(()=>findAndSendBranches());
         //update both the min and the max range. Even if one of them is being updated by the client, we will receive a number value for both the min and the max. If we don't then an error has occured or a bug is present. So if we update only the min, the old max will still be passed down so that we can generate the new leaves based off of the two values. 
         } 
         else if(branch.name === '' && (branch.min !== '' || branch.max !== '')){
              //validate the inputs from the edit form
-            if (confirmNums([branch.children, bMin, bMax])===false){
-                client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
+            if (confirmNums([branch.children, bMin, bMax])===false || bMin >= bMax ){
+                client.emit('formError', formErrMess)
                 return;
             }
             //update the branch range
@@ -258,25 +239,17 @@ io.on('connection', (client) => {
                     console.log(branch.id + ' is the branch id right before the new leaves grow. it is also ' + typeof(branch.id))
                     //add new leaves with the new branch info
                     growLeaves(branch, true)
-                }).then(()=> {
-                    //send out the updated tree
-                    Branch.findAll({
-                        include: [ {model: Leaf, as: 'leaves'}],
-                        order: Sequelize.literal('id')
-                    }).then((items)=>{
-                        io.emit('branches', {Branches: items});//send data
-                    });
-                })
+                }).then(()=> findAndSendBranches());
             })//finally, if the name and atleaset on range input is being updated
         } else if (branch.name !== '' && (branch.min !== '' || branch.max !== '')){
             //validate name
             if (checkForSpecChars(branch.name)===true || branch.name.length < 3 || branch.name.length > 15){
-                client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
+                client.emit('formError', formErrMess)
                 return;
             }
             //validate nums
-            if (confirmNums([branch.children, bMin, bMax])===false){
-                client.emit('formError', 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located on the add form for requirement details.')
+            if (confirmNums([branch.children, bMin, bMax])===false || bMin >= bMax){
+                client.emit('formError', formErrMess)
                 return;
             }
 
@@ -301,16 +274,9 @@ io.on('connection', (client) => {
                     growLeaves(branch, true)
                 }).then(()=> {
                     //send out the updated tree
-                    Branch.findAll({
-                        include: [ {model: Leaf, as: 'leaves'}],
-                        order: Sequelize.literal('id')
-                    }).then((items)=>{
-                        io.emit('branches', {Branches: items});//send data
-                    });
+                    findAndSendBranches();
                 })
             })
-
-            
         }
     })
 
