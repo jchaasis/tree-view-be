@@ -4,7 +4,8 @@ const Sequelize = require('sequelize');
 const bodyparser = require('body-parser');
 //establish server
 const port = process.env.PORT || 5000;
-const app = express().listen(PORT, () => console.log(`Listening on ${ PORT }`));;
+const app = express()
+.listen(PORT, () => console.log(`Listening on ${ PORT }`));;
 
 var http = require('http').Server(app);
 //connect to db
@@ -24,7 +25,7 @@ client2.connect();
 //   client2.end();
 // });
 
-var io = require('socket.io')(app);
+var io = require('socket.io')();
 // const io = socketIO(app);
 //initialize bodyparser
 app.use(bodyparser.urlencoded({ extended: false }));
