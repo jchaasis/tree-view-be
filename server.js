@@ -6,6 +6,22 @@ const bodyparser = require('body-parser');
 const port = process.env.PORT || 5000;
 const app = express();
 var http = require('http').Server(app);
+//connect to db
+const { Client } = require('pg');
+const client2 = new Client({
+  connectionString: process.env.DATABASE_URL,
+  ssl: true,
+});
+
+client2.connect();
+
+client2.query('SELECT table_schema,table_name FROM information_schema.tables;', (err, res) => {
+  if (err) throw err;
+  for (let row of res.rows) {
+    console.log(JSON.stringify(row));
+  }
+  client2.end();
+});
 
 var io = require('socket.io')();
 
