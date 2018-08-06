@@ -6,7 +6,7 @@ const bodyparser = require('body-parser');
 const port = process.env.PORT || 5000;
 const app = express();
 
-app.listen(port, () => console.log(`Listening on ${ port }`));
+// app.listen(port, () => console.log(`Listening on ${ port }`));
 
 var http = require('http').Server(app);
 //connect to db
