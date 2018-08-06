@@ -163,7 +163,7 @@ Leaf.sync();
 io.on('connection', (client) => {
     //functions containing repeating socket calls or sequelize queries
     function findAndSendBranches(){
-        Branch.findAll({include: [{model: Leaf, as: 'leaves'}], order: Sequelize.literal('id')})//order from oldest to newest
+        client2.Branch.findAll({include: [{model: Leaf, as: 'leaves'}], order: Sequelize.literal('id')})//order from oldest to newest
             .then((items)=>{ client.emit('branches', {Branches: items})});
     }
     //send the branch data currently stored in the database
