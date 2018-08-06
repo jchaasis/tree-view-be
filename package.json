@@ -1,7 +1,7 @@
 {
-  "name": "tree-viewer",
+  "name": "treensportation",
   "version": "1.0.0",
-  "description": "Demonstrate your knowledge of several technologies, including databases, backend design, and UI/UX by creating a live-updating tree view as a web application. ## Dependencies * body-parser * dotenv * express * express-handlebars * mysql ## Installation ### Install Locally ``` git clone  npm install ``` ### Setup Database ``` mysql -u <Your MySQL Username> -p <Your MySQL Password> \\. \\db\\schema.sql \\. \\db\\seeds.sql \\q ``` ### .env File 1. Create a new file and save as \".env\" in the root directory. 2. Copy and paste the following into the .env file:",
+  "description": "",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

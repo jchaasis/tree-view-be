@@ -104,10 +104,8 @@ Leaf.sync();
     function validateInputs(branch, edit) {
         //if its an edit and there is no new min set, then use the old min
         let min = (edit === true && branch.min === '') ? branch.oldMin : parseInt(branch.min);
-    
         //if its an edit and there is no new max set, then use the old max
         let max = (edit === true && branch.max === '') ? branch.oldMax : parseInt(branch.max);
-
         let valid = true;
         //Make sure that there are no symbols in any of the inputs
         if (checkForSpecChars([branch.name, branch.children, min, max])=== true){
@@ -134,19 +132,14 @@ Leaf.sync();
     }
 
     //store the message so we don't have to repeat it multiple times
-    const formErrMess = 'Please ensure that all form inputs abide by the form requirements. Hover over the question mark located next to the root for requirement details.';
+    const formErrMess = 'Please ensure that all form inputs abide by the form requirements. Click on the question mark located next to the root for requirement details.';
 
 //socket stuff
 io.on('connection', (client) => {
     //functions containing repeating socket calls or sequelize queries
     function findAndSendBranches(){
-        Branch.findAll({
-            include: [ {model: Leaf, as: 'leaves'}],
-            // Will order by id 
-            order: Sequelize.literal('id')
-            }).then((items)=>{
-                client.emit('branches', {Branches: items});//send data
-            });
+        Branch.findAll({include: [{model: Leaf, as: 'leaves'}], order: Sequelize.literal('id')})//order from oldest to newest
+            .then((items)=>{ client.emit('branches', {Branches: items})});
     }
     //send the branch data currently stored in the database
     client.on('getBranchData', (b)=> {
@@ -167,27 +160,17 @@ io.on('connection', (client) => {
             children: formData.children,
             min: formData.min,
             max: formData.max,
-        }).then((branch)=> {
-           //create a batch of leaves
-            growLeaves(branch)
-        })
-        .then(()=> findAndSendBranches());
+        }).then((branch)=> {growLeaves(branch)}) //create a batch of leaves
+        .then(()=> findAndSendBranches()); //send updated tree
     })
 
     //remove a branch from the table. Once removed, remove the associated leaves as well. once both of those tasks are complete, emit the updated tree to all active users.
     client.on('deleteBranch', branch=> {
-        Branch.destroy({
-            where: {
-                id: branch
-            }
-        }).then(()=>{
-            Leaf.destroy({
-                where: {
-                    branchId: branch
-                }
-            })
-        }).then(()=> findAndSendBranches());
+        Branch.destroy({where: {id: branch}})//delete branch instance
+            .then(()=> Leaf.destroy({ where: {branchId: branch}}))//delete leaf instances associated with deleted branch
+            .then(()=> findAndSendBranches());//send updated tree
     });
+    
     //updatethe branches
     client.on('updateBranch', branch=> {
         //handle the validation on the front end. This way, if there is a range update, we can perform that update in one conditional statement. 
@@ -206,13 +189,8 @@ io.on('connection', (client) => {
                 client.emit('formError', formErrMess)
                 return;
             }
-            Branch.update(
-                {name: branch.name},
-                {
-                where: {
-                    id: branch.id
-                }
-            }).then(()=>findAndSendBranches());
+            Branch.update({name: branch.name},{where: {id: branch.id}})
+                .then(()=>findAndSendBranches());//send updated tree
         //update both the min and the max range. Even if one of them is being updated by the client, we will receive a number value for both the min and the max. If we don't then an error has occured or a bug is present. So if we update only the min, the old max will still be passed down so that we can generate the new leaves based off of the two values. 
         } 
         else if(branch.name === '' && (branch.min !== '' || branch.max !== '')){
@@ -223,24 +201,12 @@ io.on('connection', (client) => {
             }
             //update the branch range
             Branch.update(
-                {min: bMin,
-                max: bMax},
-                {
-                where: {
-                    id: branch.id
-                }
-            }).then(()=> {
-                //remove the previous leaves before adding new ones
-                Leaf.destroy({
-                    where: {
-                        branchId: branch.id
-                    }
-                }).then(()=>{
-                    console.log(branch.id + ' is the branch id right before the new leaves grow. it is also ' + typeof(branch.id))
-                    //add new leaves with the new branch info
-                    growLeaves(branch, true)
-                }).then(()=> findAndSendBranches());
-            })//finally, if the name and atleaset on range input is being updated
+                {min: bMin, max: bMax},
+                {where: {id: branch.id}})
+                .then(()=> Leaf.destroy({where: {branchId: branch.id}})) //remove the previous leaves before adding new ones
+                .then(()=> growLeaves(branch, true))//grow new leaves
+                .then(()=> findAndSendBranches());//send new tree info
+           //finally, if the name and atleaset on range input is being updated
         } else if (branch.name !== '' && (branch.min !== '' || branch.max !== '')){
             //validate name
             if (checkForSpecChars(branch.name)===true || branch.name.length < 3 || branch.name.length > 15){
@@ -252,31 +218,12 @@ io.on('connection', (client) => {
                 client.emit('formError', formErrMess)
                 return;
             }
-
             Branch.update(
-                {
-                name: branch.name,
-                min: bMin,
-                max: bMax},
-                {
-                where: {
-                    id: branch.id
-                }
-            }).then(()=> {
-                //remove the previous leaves before adding new ones
-                Leaf.destroy({
-                    where: {
-                        branchId: branch.id
-                    }
-                }).then(()=>{
-                    console.log(branch.id + ' is the branch id right before the new leaves grow. it is also ' + typeof(branch.id))
-                    //add new leaves with the new branch info
-                    growLeaves(branch, true)
-                }).then(()=> {
-                    //send out the updated tree
-                    findAndSendBranches();
-                })
-            })
+                {name: branch.name, min: bMin, max: bMax},
+                {where: {id: branch.id}})
+                .then(()=> Leaf.destroy({ where: {branchId: branch.id}}))//remove the previous leaves before adding new ones
+                .then(()=> growLeaves(branch, true)) //add new leaves with the new branch info
+                .then(()=> findAndSendBranches())  //send out the updated tree
         }
     })
 
