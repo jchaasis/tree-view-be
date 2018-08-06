@@ -1,4 +1,7 @@
 'use strict';
+
+//DISCLAIMER: I would normally break this down into several files. I included everything in one file in hopes that it might make it easier for the reviewer to scroll through in one fell swoop. If it did the complete opposite, and made the file more confusing, I apologize!
+
 const express = require('express');
 const Sequelize = require('sequelize');
 //will use bodyparser to accept the form data for the score
@@ -6,103 +9,61 @@ const bodyparser = require('body-parser');
 //establish server
 const port = process.env.PORT || 5000;
 const app = express();
-
-// app.listen(port, () => console.log(`Listening on ${ port }`));
-
-var http = require('http').Server(app);
-//connect to db
-const { Client } = require('pg');
-const client2 = new Client({
-  connectionString: process.env.DATABASE_URL,
-  ssl: true,
-});
-
-client2.connect();
-
-// client2.query('SELECT table_schema,table_name FROM information_schema.tables;', (err, res) => {
-//   if (err) throw err;
-//   for (let row of res.rows) {
-//     console.log(JSON.stringify(row));
-//   }
-//   client2.end();
-// });
-
-var io = require('socket.io')();
-// const io = socketIO(app);
 //initialize bodyparser
 app.use(bodyparser.urlencoded({ extended: false }));
-
 //enable cors
 app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     next();
 });
-//create database
 
+var http = require('http').Server(app);
+//connect socket.io
+var io = require('socket.io')();
 
-// if (process.env.HEROKU_POSTGRESQL_BRONZE_URL) {
-//     // the application is executed on Heroku ... use the postgres database
-//     sequelize = new Sequelize(process.env.HEROKU_POSTGRESQL_BRONZE_URL, {
-//       dialect:  'postgres',
-//       protocol: 'postgres',
-//       port:     match[4],
-//       host:     match[3],
-//       logging:  true //false
-//     })
-//   } else {
-//     // the application is executed on the local machine ... use mysql
-//     sequelize = new Sequelize('example-app-db', 'root', null)
-//   }
-// const db = new Sequelize('treeView', 'christianhaasis', '', {
+//////////////////////////////Begin Models 
+
+//For development purposes: const db = new Sequelize('treeView', 'christianhaasis', '', {
 //     dialect: 'postgres',
 // });
-
+//create database
 const db = new Sequelize(process.env.DATABASE_URL, {
     dialect:  'postgres',
           protocol: 'postgres',
-       
-})
+});
 
-//schema for the branch database
+//model for the branch database
 const Branch = db.define('branch', {
     name: Sequelize.STRING,
     children: Sequelize.INTEGER,
     min: Sequelize.INTEGER,
     max: Sequelize.INTEGER
 });
-
-
-client2.query('SELECT * FROM branches;', (err, res) => {
-    if (err) throw err;
-    for (let row of res.rows) {
-      console.log(JSON.stringify(row));
-    }
-    client2.end();
-  });
-
+//model for the leaf database
 const Leaf = db.define('leaf', {
     branchId: Sequelize.INTEGER,
     leafNumber: Sequelize.INTEGER
 });
 
-//table relationships
+//establish table associations
 Branch.hasMany(Leaf, {foreignkey: 'branchId', as: 'leaves'});
 Leaf.belongsTo(Branch, {foreignKey: 'branchId'});
 
-// Sychronize the schemas with the database, meaning make
+// Sychronize the models with the database, meaning make
 // sure all tables exist and have the right fields.
 Branch.sync();
 Leaf.sync();
+////////////////End Models
 
-//utility functions. TODO: move these elsewhere
+///////Begin utility functions. 
     //get a random number between the range set 
     function getRandomInt(min, max) {
         min = Math.ceil(min);
         max = Math.floor(max);
         return Math.floor(Math.random() * (max - min)) + min; 
       }
-
+    //add leaves to the leaves database
     function growLeaves(branch, edit) {
         //if edit is true, then this will be a generation of new leaves based off of the edited range of a preexisting branch. We need to store the appropriate min and max values for use in leaf generation. 
           //if its an edit and there is no new min set, then use the old min
@@ -124,7 +85,7 @@ Leaf.sync();
         //create a bulk of instances based off of the numbers stored in the leaves array
         Leaf.bulkCreate(leaves);
     }
-
+    //check for special characters in inputs
     function checkForSpecChars(arr){
         //store the chars counter
         let specCharsPresent = false;
@@ -138,7 +99,7 @@ Leaf.sync();
         }
         return specCharsPresent;
     }
-
+    //make sure that the number inputs are actually numbers and don't include letters or special characters.
     function confirmNums(nums){
         let allNums = true;
         //make sure that the number inputs are actually numbers.
@@ -150,7 +111,7 @@ Leaf.sync();
         }
         return allNums;
     }
-
+    //validate the form inputs
     function validateInputs(branch, edit) {
         //if its an edit and there is no new min set, then use the old min
         let min = (edit === true && branch.min === '') ? branch.oldMin : parseInt(branch.min);
@@ -180,9 +141,9 @@ Leaf.sync();
 
         return valid;
     }
-
     //store the message so we don't have to repeat it multiple times
     const formErrMess = 'Please ensure that all form inputs abide by the form requirements. Click on the question mark located next to the root for requirement details.';
+/////////////////End utility functions
 
 //socket stuff
 io.on('connection', (client) => {
@@ -193,7 +154,7 @@ io.on('connection', (client) => {
     }
     //send the branch data currently stored in the database
     client.on('getBranchData', (b)=> {
-        console.log('a user is receiving the branch ', b );
+        console.log('a user is receiving the branchs');
         //get all the branches
         findAndSendBranches();
     })
@@ -223,10 +184,10 @@ io.on('connection', (client) => {
     
     //updatethe branches
     client.on('updateBranch', branch=> {
-        //handle the validation on the front end. This way, if there is a range update, we can perform that update in one conditional statement. 
+        //if only one number is being updated we need to store the old number for the opposing range value.
         let bMin = branch.min === '' ? branch.oldMin : parseInt(branch.min);
         let bMax = branch.max === '' ? branch.oldMax : parseInt(branch.max);
-        console.log(branch)
+       
         //validate the inputs from the edit form
         if (checkForSpecChars(branch)===true){
             client.emit('formError', formErrMess)
@@ -241,6 +202,7 @@ io.on('connection', (client) => {
             }
             Branch.update({name: branch.name},{where: {id: branch.id}})
                 .then(()=>findAndSendBranches());//send updated tree
+                
         //update both the min and the max range. Even if one of them is being updated by the client, we will receive a number value for both the min and the max. If we don't then an error has occured or a bug is present. So if we update only the min, the old max will still be passed down so that we can generate the new leaves based off of the two values. 
         } 
         else if(branch.name === '' && (branch.min !== '' || branch.max !== '')){
@@ -282,10 +244,6 @@ io.on('connection', (client) => {
         console.log('user disconnected');
       });
 });
-
-// app.listen(port, () => console.log(`Listening on ${ port }`));
+//listen for activity
 io.listen(port);
 console.log(`Listening on port ${port}`);
-// app.listen(port, function(){
-//     console.log(`Listening on port ${port}`);
-//   });
