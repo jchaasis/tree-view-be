@@ -1,3 +1,4 @@
+'use strict';
 const express = require('express');
 const Sequelize = require('sequelize');
 //will use bodyparser to accept the form data for the score
@@ -188,7 +189,7 @@ io.on('connection', (client) => {
     //functions containing repeating socket calls or sequelize queries
     function findAndSendBranches(){
         Branch.findAll({include: [{model: Leaf, as: 'leaves'}], order: Sequelize.literal('id')})//order from oldest to newest
-            .then((items)=>{ client.emit('branches', {Branches: items})});
+            .then((items)=>{ io.emit('branches', {Branches: items})});
     }
     //send the branch data currently stored in the database
     client.on('getBranchData', (b)=> {
