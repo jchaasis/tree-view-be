@@ -35,9 +35,32 @@ app.use(function(req, res, next) {
     next();
 });
 //create database
-const db = new Sequelize('treeView', 'christianhaasis', '', {
-    dialect: 'postgres',
-});
+
+
+// if (process.env.HEROKU_POSTGRESQL_BRONZE_URL) {
+//     // the application is executed on Heroku ... use the postgres database
+//     sequelize = new Sequelize(process.env.HEROKU_POSTGRESQL_BRONZE_URL, {
+//       dialect:  'postgres',
+//       protocol: 'postgres',
+//       port:     match[4],
+//       host:     match[3],
+//       logging:  true //false
+//     })
+//   } else {
+//     // the application is executed on the local machine ... use mysql
+//     sequelize = new Sequelize('example-app-db', 'root', null)
+//   }
+// const db = new Sequelize('treeView', 'christianhaasis', '', {
+//     dialect: 'postgres',
+// });
+
+const db = new Sequelize(process.env.DATABASE_URL, {
+    dialect:  'postgres',
+          protocol: 'postgres',
+          port:     match[4],
+          host:     match[3],
+          logging:  true
+})
 
 //schema for the branch database
 const Branch = db.define('branch', {
@@ -163,7 +186,7 @@ Leaf.sync();
 io.on('connection', (client) => {
     //functions containing repeating socket calls or sequelize queries
     function findAndSendBranches(){
-        client2.Branch.findAll({include: [{model: Leaf, as: 'leaves'}], order: Sequelize.literal('id')})//order from oldest to newest
+        Branch.findAll({include: [{model: Leaf, as: 'leaves'}], order: Sequelize.literal('id')})//order from oldest to newest
             .then((items)=>{ client.emit('branches', {Branches: items})});
     }
     //send the branch data currently stored in the database
