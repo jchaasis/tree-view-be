@@ -15,13 +15,13 @@ const client2 = new Client({
 
 client2.connect();
 
-client2.query('SELECT table_schema,table_name FROM information_schema.tables;', (err, res) => {
-  if (err) throw err;
-  for (let row of res.rows) {
-    console.log(JSON.stringify(row));
-  }
-  client2.end();
-});
+// client2.query('SELECT table_schema,table_name FROM information_schema.tables;', (err, res) => {
+//   if (err) throw err;
+//   for (let row of res.rows) {
+//     console.log(JSON.stringify(row));
+//   }
+//   client2.end();
+// });
 
 var io = require('socket.io')();
 
@@ -46,6 +46,15 @@ const Branch = db.define('branch', {
     min: Sequelize.INTEGER,
     max: Sequelize.INTEGER
 });
+
+
+client2.query('SELECT * FROM branches;', (err, res) => {
+    if (err) throw err;
+    for (let row of res.rows) {
+      console.log(JSON.stringify(row));
+    }
+    client2.end();
+  });
 
 const Leaf = db.define('leaf', {
     branchId: Sequelize.INTEGER,
